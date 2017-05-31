@@ -1,8 +1,8 @@
 #
-# Cookbook:: rsyslog
+# Cookbook Name:: rsyslog
 # Recipe:: default
 #
-# Copyright:: 2009-2016, Chef Software, Inc.
+# Copyright 2009-2015, Chef Software, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,11 +17,13 @@
 # limitations under the License.
 #
 
+extend RsyslogCookbook::Helpers
+
 package 'rsyslog'
 package 'rsyslog-relp' if node['rsyslog']['use_relp']
 
 if node['rsyslog']['enable_tls'] && node['rsyslog']['tls_ca_file']
-  raise "Recipe rsyslog::default can not use 'enable_tls' with protocol '#{node['rsyslog']['protocol']}' (requires 'tcp')" unless node['rsyslog']['protocol'] == 'tcp'
+  Chef::Application.fatal!("Recipe rsyslog::default can not use 'enable_tls' with protocol '#{node['rsyslog']['protocol']}' (requires 'tcp')") unless node['rsyslog']['protocol'] == 'tcp'
   package 'rsyslog-gnutls'
 end
 
@@ -37,11 +39,6 @@ directory node['rsyslog']['working_dir'] do
   mode  '0700'
 end
 
-execute 'validate_config' do
-  command "rsyslogd -N 1 -f #{node['rsyslog']['config_prefix']}/rsyslog.conf"
-  action  :nothing
-end
-
 # Our main stub which then does its own rsyslog-specific
 # include of things in /etc/rsyslog.d/*
 template "#{node['rsyslog']['config_prefix']}/rsyslog.conf" do
@@ -49,7 +46,6 @@ template "#{node['rsyslog']['config_prefix']}/rsyslog.conf" do
   owner   'root'
   group   'root'
   mode    '0644'
-  notifies :run, 'execute[validate_config]'
   notifies :restart, "service[#{node['rsyslog']['service_name']}]"
 end
 
@@ -58,7 +54,6 @@ template "#{node['rsyslog']['config_prefix']}/rsyslog.d/50-default.conf" do
   owner   'root'
   group   'root'
   mode    '0644'
-  notifies :run, 'execute[validate_config]'
   notifies :restart, "service[#{node['rsyslog']['service_name']}]"
 end
 
@@ -91,7 +86,4 @@ if platform_family?('omnios')
   end
 end
 
-service node['rsyslog']['service_name'] do
-  supports restart: true, status: true
-  action [:enable, :start]
-end
+declare_rsyslog_service
